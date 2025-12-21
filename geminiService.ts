@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { TranslationResult } from "./types";
 
@@ -6,8 +5,7 @@ export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
-  // APK build aşamasında API_KEY güvenli bir şekilde enjekte edilir.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const modelName = 'gemini-3-flash-preview';
 
   let base64Data = "";
@@ -17,13 +15,9 @@ export const translateMangaPage = async (
     base64Data = imageInput;
   }
 
-  const systemInstruction = `Sen profesyonel bir Manga ve Webtoon çeviri motorusun. 
-Görevin: Görüntüdeki tüm Japonca/Korece metin kutularını (speech bubbles) bul, OCR yap ve ${targetLang} diline çevir.
-Kurallar:
-1. Sadece JSON formatında yanıt ver.
-2. Koordinatlar [ymin, xmin, ymax, xmax] formatında 0-1000 arasında olsun.
-3. Onomatopeleri (ses efektlerini) çevirme, sadece konuşma balonlarını ve anlatıcı metinlerini çevir.
-4. Çeviriler doğal, akıcı ve manga jargonuna uygun olsun.`;
+  const systemInstruction = `Sen profesyonel bir Manga çeviri motorusun.
+Görevin: Görüntüdeki konuşma balonlarını bul ve ${targetLang} diline çevir.
+Kurallar: Sadece JSON döndür. Koordinatlar 0-1000 arası [ymin, xmin, ymax, xmax].`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -32,7 +26,7 @@ Kurallar:
         {
           parts: [
             { inlineData: { mimeType: 'image/png', data: base64Data } },
-            { text: `Bu manga sayfasındaki metinleri ${targetLang} diline çevir ve JSON olarak döndür.` }
+            { text: `Çeviriyi JSON olarak yap.` }
           ],
         },
       ],
@@ -42,14 +36,16 @@ Kurallar:
       },
     });
 
-    const textOutput = response.text;
-    if (!textOutput) return { bubbles: [] };
+    const text = response.text;
+    if (!text) return { bubbles: [] };
     
-    const parsed = JSON.parse(textOutput.trim());
+    // Markdown bloklarını temizle
+    const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleanJson);
     return (parsed.bubbles ? parsed : { bubbles: [] }) as TranslationResult;
 
   } catch (error: any) {
-    console.error("Manga AI Engine Error:", error);
+    console.error("AI Error:", error);
     return { bubbles: [] };
   }
 };
