@@ -14,7 +14,7 @@ const App: React.FC = () => {
   
   const viewerRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const lastScanY = useRef<number>(-2000);
+  const lastScanY = useRef<number>(-5000); // İlk başta tetiklenmesi için uzak değer
   
   const [settings, setSettings] = useState<EngineSettings>({
     isEnabled: true,
@@ -40,8 +40,9 @@ const App: React.FC = () => {
             absoluteY: scrollY + (b.box_2d[0] / 1000) * viewHeight
         }));
         setBubbles(prev => {
-           const currentViewMin = scrollY - 1000;
-           const currentViewMax = scrollY + 2000;
+           // Eski balonları temizle (hafıza yönetimi için sadece yakındakileri tut)
+           const currentViewMin = scrollY - 2000;
+           const currentViewMax = scrollY + 3000;
            const filtered = prev.filter(p => (p.absoluteY || 0) > currentViewMin && (p.absoluteY || 0) < currentViewMax);
            return [...filtered, ...processed];
         });
@@ -61,6 +62,7 @@ const App: React.FC = () => {
         const base64 = event.target?.result as string;
         setCustomImage(base64);
         setIsBrowserMode(false);
+        setBubbles([]);
         processFrame(base64, 0, 800);
       };
       reader.readAsDataURL(file);
@@ -69,7 +71,7 @@ const App: React.FC = () => {
 
   const handleScrollStop = useCallback((imgSource: string, scrollY: number, viewHeight: number) => {
     const scrollDiff = Math.abs(scrollY - lastScanY.current);
-    if (scrollDiff > 350) {
+    if (scrollDiff > 400) { // Her 400px kaydırmada bir tara
       lastScanY.current = scrollY;
       processFrame(imgSource, scrollY, viewHeight);
     }
@@ -77,6 +79,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-[#050507] overflow-hidden select-none font-sans safe-top">
+      {/* Header Panel */}
       <div className="w-full max-w-md pt-8 pb-4 px-6 bg-zinc-900/80 backdrop-blur-xl border-b border-white/5 z-30">
         <div className="flex items-center justify-between mb-4">
           <div className="flex flex-col">
@@ -86,23 +89,23 @@ const App: React.FC = () => {
             <div className="flex items-center space-x-1.5 mt-0.5">
               <div className={`w-1.5 h-1.5 rounded-full ${isProcessing ? 'bg-blue-500 animate-ping' : 'bg-green-500 shadow-[0_0_8px_#22c55e]'}`}></div>
               <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">
-                {isProcessing ? 'AI ENGINE: PROCESSING' : 'AI ENGINE: STANDBY'}
+                {isProcessing ? 'AI ENGINE: TRANSLATING' : 'AI ENGINE: ACTIVE'}
               </span>
             </div>
           </div>
           <div className="flex space-x-2">
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
-            <button onClick={() => fileInputRef.current?.click()} className="w-10 h-10 bg-zinc-800/50 border border-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-all">
+            <button onClick={() => fileInputRef.current?.click()} className="w-10 h-10 bg-zinc-800/50 border border-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-all shadow-lg">
               <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             </button>
-            <button onClick={() => { setIsBrowserMode(!isBrowserMode); setBubbles([]); }} className={`w-10 h-10 border rounded-2xl flex items-center justify-center active:scale-95 transition-all ${isBrowserMode ? 'bg-blue-600 border-blue-400 shadow-[0_8px_20px_rgba(37,99,235,0.4)]' : 'bg-zinc-800/50 border-white/10'}`}>
+            <button onClick={() => { setIsBrowserMode(!isBrowserMode); setBubbles([]); }} className={`w-10 h-10 border rounded-2xl flex items-center justify-center active:scale-95 transition-all shadow-lg ${isBrowserMode ? 'bg-blue-600 border-blue-400 shadow-blue-900/40' : 'bg-zinc-800/50 border-white/10'}`}>
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
             </button>
           </div>
         </div>
         {isBrowserMode && (
           <div className="flex items-center bg-black/60 border border-white/5 rounded-2xl px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-300">
-            <span className="text-blue-500 font-black text-[9px] mr-3 tracking-widest">LIVE</span>
+            <span className="text-blue-500 font-black text-[9px] mr-3 tracking-widest">WEB LIVE</span>
             <input 
               type="text" 
               value={browserUrl} 
@@ -114,9 +117,10 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Viewer Area */}
       <div className="w-full flex-grow flex items-center justify-center relative z-10 px-4">
         <MangaViewer 
-            ref={viewerRef} 
             bubbles={bubbles} 
             settings={settings} 
             isProcessing={isProcessing} 
@@ -124,7 +128,11 @@ const App: React.FC = () => {
             customImage={isBrowserMode ? null : customImage}
         />
       </div>
+
+      {/* Control Panel UI */}
       <ControlPanel settings={settings} setSettings={setSettings} isProcessing={isProcessing} />
+      
+      {/* Android Home Indicator Spacer */}
       <div className="w-full flex justify-center pb-6 pt-2 safe-bottom">
         <div className="w-28 h-1.5 bg-white/10 rounded-full"></div>
       </div>
