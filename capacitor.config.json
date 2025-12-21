@@ -1,0 +1,7 @@
+
+{
+  "appId": "com.mangaturk.app",
+  "appName": "MangaTurk",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
