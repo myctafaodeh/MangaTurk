@@ -1,5 +1,5 @@
 
-import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useEffect, forwardRef, useImperativeHandle, useState } from 'react';
 import { SpeechBubble, EngineSettings } from './types';
 
 interface MangaViewerProps {
@@ -8,25 +8,30 @@ interface MangaViewerProps {
   isProcessing: boolean;
   onScrollStop: (viewData: string, scrollPos: number, viewHeight: number) => void;
   customImage: string | null;
+  activeUrl?: string | null;
 }
 
 export interface MangaViewerHandle {
   captureViewport: () => string | null;
 }
 
-const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, settings, isProcessing, onScrollStop, customImage }, ref) => {
+const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, settings, isProcessing, onScrollStop, customImage, activeUrl }, ref) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [isIframeLoading, setIsIframeLoading] = useState(false);
   
   const demoImages = [
-    "https://images.unsplash.com/photo-1578632738980-23055508882d?q=80&w=1000&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?q=80&w=1000&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?q=80&w=1000&auto=format&fit=crop"
+    "https://images.unsplash.com/photo-1578632738980-23055508882d?q=80&w=1000&auto=format&fit=crop"
   ];
 
   useImperativeHandle(ref, () => ({
     captureViewport: () => customImage || demoImages[0]
   }));
+
+  useEffect(() => {
+    if (activeUrl) setIsIframeLoading(true);
+  }, [activeUrl]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -37,30 +42,72 @@ const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, 
       if (timeout) clearTimeout(timeout);
       timeout = setTimeout(() => {
         if (settings.isEnabled) {
-          onScrollStop(customImage || demoImages[0], el.scrollTop, el.clientHeight); 
+          onScrollStop(customImage || activeUrl || demoImages[0], el.scrollTop, el.clientHeight); 
         }
-      }, 700);
+      }, 1000);
     };
 
     el.addEventListener('scroll', handleScroll);
     return () => el.removeEventListener('scroll', handleScroll);
-  }, [settings.isEnabled, onScrollStop, customImage]);
+  }, [settings.isEnabled, onScrollStop, customImage, activeUrl]);
 
   return (
-    <div className="relative w-full h-[70vh] max-w-md mx-auto bg-black rounded-[3rem] border-[10px] border-zinc-900 shadow-[0_50px_100px_-20px_rgba(0,0,0,1)] overflow-hidden ring-1 ring-white/10">
+    <div className="relative w-full h-full bg-black overflow-hidden">
+      
+      {/* AI Scan Line */}
       {isProcessing && (
-        <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent z-[60] animate-scan-line shadow-[0_0_15px_#3b82f6]"></div>
+        <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent z-[60] animate-scan-line shadow-[0_0_20px_#3b82f6]"></div>
       )}
-      <div className="absolute top-0 inset-x-0 h-10 flex items-center justify-center z-[100] pointer-events-none">
-        <div className="w-28 h-6 bg-zinc-900 rounded-b-[2rem] border-x border-b border-white/5 flex items-center justify-around px-4">
-            <div className="w-2 h-2 rounded-full bg-zinc-800"></div>
-            <div className="w-10 h-1.5 bg-black rounded-full"></div>
-        </div>
-      </div>
-      <div ref={scrollRef} className="h-full overflow-y-auto custom-scroll bg-white relative scroll-smooth overscroll-none">
-        <div ref={containerRef} className="relative w-full flex flex-col">
-            {customImage ? (
-                <div className="w-full relative min-h-[100vh]">
+
+      {/* Main Content Area */}
+      <div ref={scrollRef} className="h-full w-full overflow-y-auto custom-scroll bg-black relative scroll-smooth overflow-x-hidden">
+        <div ref={containerRef} className="relative w-full flex flex-col min-h-full">
+            
+            {activeUrl ? (
+                <div className="w-full min-h-full relative bg-white">
+                    {isIframeLoading && (
+                      <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-900 text-white">
+                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="text-xs font-bold tracking-widest text-zinc-500 uppercase">Sayfa Yükleniyor...</p>
+                      </div>
+                    )}
+                    <iframe 
+                      key={activeUrl} // Force reload on URL change
+                      ref={iframeRef}
+                      src={activeUrl} 
+                      onLoad={() => setIsIframeLoading(false)}
+                      className="w-full h-[500vh] border-none pointer-events-auto"
+                      title="Manga Browser"
+                    />
+                    {/* Translation Overlay for Web */}
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                        {bubbles.map(bubble => (
+                            <div 
+                                key={bubble.id}
+                                className="absolute flex items-center justify-center text-center font-bold z-40 animate-in zoom-in duration-300 shadow-xl"
+                                style={{
+                                    top: `${bubble.absoluteY}px`,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: '85%',
+                                    minHeight: '45px',
+                                    backgroundColor: `rgba(255, 255, 255, ${settings.opacity})`,
+                                    borderRadius: '16px',
+                                    border: '2px solid black',
+                                    color: 'black',
+                                    fontSize: `${settings.fontSize}px`,
+                                    fontFamily: "'Shadows Into Light', cursive",
+                                    padding: '12px',
+                                    boxSizing: 'border-box'
+                                }}
+                            >
+                                {bubble.translated_text}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : customImage ? (
+                <div className="w-full relative min-h-screen">
                     <img src={customImage} className="w-full h-auto block" alt="Manga" />
                     {bubbles.map(bubble => (
                          <div 
@@ -86,50 +133,33 @@ const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, 
                     ))}
                 </div>
             ) : (
-                <div className="relative flex flex-col">
-                    {demoImages.map((src, idx) => (
-                        <div key={idx} className="w-full relative">
-                            <img src={src} className="w-full h-auto grayscale-[0.3] hover:grayscale-0 transition-all duration-700" alt={`Page ${idx}`} />
-                            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/10"></div>
-                        </div>
-                    ))}
-                    {settings.isEnabled && !settings.showOriginal && bubbles.map((bubble) => (
-                        <div 
-                            key={bubble.id}
-                            className="absolute flex items-center justify-center text-center font-bold z-40 animate-in fade-in slide-in-from-bottom-4 duration-500"
-                            style={{
-                                top: `${bubble.absoluteY}px`,
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: '88%',
-                                minHeight: '55px',
-                                backgroundColor: `rgba(255, 255, 255, ${settings.opacity})`,
-                                borderRadius: '30px',
-                                border: '3px solid black',
-                                color: 'black',
-                                fontSize: `${settings.fontSize + 2}px`,
-                                fontFamily: "'Shadows Into Light', cursive",
-                                padding: '15px 20px',
-                                boxSizing: 'border-box',
-                                boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
-                            }}
-                        >
-                            <span className="leading-[1.1]">{bubble.translated_text}</span>
-                        </div>
-                    ))}
+                <div className="flex flex-col items-center justify-center h-screen p-10 text-center bg-zinc-950">
+                    <div className="w-20 h-20 rounded-3xl bg-zinc-900 flex items-center justify-center mb-6 shadow-2xl border border-white/5">
+                      <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                    </div>
+                    <h3 className="text-white font-black text-lg uppercase tracking-tight mb-2">Webtoon URL Girin</h3>
+                    <p className="text-zinc-500 text-xs font-semibold leading-relaxed max-w-[200px]">Üst panelden bir web adresi yazarak veya görsel yükleyerek başlayın.</p>
                 </div>
             )}
         </div>
       </div>
-      <div className="absolute bottom-6 inset-x-0 flex justify-center pointer-events-none z-50">
-         <div className="bg-black/60 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center space-x-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-            <span className="text-[9px] text-zinc-300 font-bold tracking-widest uppercase">Live AI Sync</span>
-         </div>
-      </div>
+
+      {/* Sync Badge */}
+      {!isProcessing && (
+        <div className="absolute bottom-6 right-6 pointer-events-none z-50">
+           <div className="bg-black/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-2xl flex items-center space-x-2 shadow-2xl">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+              <span className="text-[10px] text-zinc-300 font-black tracking-widest uppercase">AUTO-SYNC</span>
+           </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes scan-line { 0% { top: 0; } 100% { top: 100%; } }
-        .animate-scan-line { animation: scan-line 2s linear infinite; }
+        .animate-scan-line { animation: scan-line 3s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+        .custom-scroll::-webkit-scrollbar { width: 0; }
       `}</style>
     </div>
   );
