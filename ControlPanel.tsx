@@ -11,57 +11,58 @@ interface ControlPanelProps {
 const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isProcessing }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Floating trigger button when panel is closed
   if (!isOpen) {
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-12 right-6 w-18 h-18 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-[0_25px_60px_rgba(37,99,235,0.5)] border-2 border-white/30 z-[2000] active:scale-90 transition-all"
+        className="fixed bottom-12 right-6 w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center shadow-[0_20px_50px_rgba(37,99,235,0.4)] border border-white/20 z-[2000] active:scale-90 transition-all"
       >
-        <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
       </button>
     );
   }
 
   return (
-    <div className="fixed inset-x-4 bottom-10 bg-zinc-950/98 backdrop-blur-3xl border border-white/10 rounded-[3rem] shadow-2xl z-[2000] animate-in slide-in-from-bottom-20 duration-500">
+    <div className="fixed inset-x-4 bottom-8 bg-zinc-950/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-2xl z-[2000] animate-in slide-in-from-bottom-10 duration-500 overflow-hidden">
       <div className="p-8">
         <div className="flex items-center justify-between mb-8">
            <div className="flex items-center space-x-3">
-              {/* STATUS LED */}
               <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
                 !settings.isEnabled ? 'bg-zinc-700' : 
                 isProcessing ? 'bg-blue-500 shadow-[0_0_15px_#3b82f6] animate-pulse' : 
                 'bg-green-500 shadow-[0_0_12px_#22c55e]'
               }`}></div>
-              <span className="text-[12px] font-black text-white uppercase tracking-[0.2em]">AI ENGINE PANEL</span>
+              <span className="text-[11px] font-black text-white uppercase tracking-widest">Motor Kontrolü</span>
            </div>
-           <button onClick={() => setIsOpen(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center active:scale-90">
+           <button onClick={() => setIsOpen(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center active:bg-white/10">
               <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
            </button>
         </div>
 
-        <div className="space-y-10">
+        <div className="space-y-8">
            {/* Diller */}
-           <div className="grid grid-cols-2 gap-4 bg-white/5 p-2 rounded-2xl border border-white/5">
+           <div className="grid grid-cols-2 gap-3 bg-white/5 p-2 rounded-2xl border border-white/5">
               <div className="flex flex-col text-center">
-                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase">Kaynak</span>
+                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase tracking-tighter">Kaynak Dil</span>
                  <select 
                    value={settings.sourceLanguage}
                    onChange={(e) => setSettings(s => ({ ...s, sourceLanguage: e.target.value }))}
-                   className="bg-transparent py-2 text-sm font-black text-blue-400 outline-none appearance-none text-center"
+                   className="bg-transparent py-2 text-sm font-black text-blue-400 outline-none appearance-none text-center cursor-pointer"
                  >
-                   <option value="auto">OTOMATİK</option>
+                   <option value="auto">OTOMATİK ALGIN</option>
                    <option value="Japanese">JAPONCA</option>
                    <option value="Korean">KORECE</option>
+                   <option value="Chinese">ÇİNCE (BASİT)</option>
+                   <option value="Traditional Chinese">ÇİNCE (GELENK.)</option>
+                   <option value="English">İNGİLİZCE</option>
                  </select>
               </div>
               <div className="flex flex-col text-center border-l border-white/5">
-                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase">Hedef</span>
+                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase tracking-tighter">Hedef Dil</span>
                  <select 
                    value={settings.targetLanguage}
                    onChange={(e) => setSettings(s => ({ ...s, targetLanguage: e.target.value }))}
-                   className="bg-transparent py-2 text-sm font-black text-white outline-none appearance-none text-center"
+                   className="bg-transparent py-2 text-sm font-black text-white outline-none appearance-none text-center cursor-pointer"
                  >
                    <option value="Turkish">TÜRKÇE</option>
                    <option value="English">ENGLISH</option>
@@ -70,50 +71,50 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isPr
            </div>
 
            {/* Ana Aksiyonlar */}
-           <div className="grid grid-cols-2 gap-5">
+           <div className="grid grid-cols-2 gap-4">
               <button 
                 onClick={() => setSettings(s => ({ ...s, isEnabled: !s.isEnabled }))}
-                className={`py-6 rounded-[1.5rem] text-[12px] font-black tracking-widest transition-all shadow-xl active:scale-95 ${
+                className={`py-5 rounded-2xl text-[10px] font-black tracking-widest transition-all shadow-xl active:scale-95 ${
                   settings.isEnabled 
                     ? 'bg-zinc-800 text-red-500 border border-red-500/20' 
                     : 'bg-green-600 text-white shadow-green-600/20'
                 }`}
               >
-                {settings.isEnabled ? 'MOTORU DURDUR' : 'MOTORU BAŞLAT'}
+                {settings.isEnabled ? 'SİSTEMİ DURDUR' : 'SİSTEMİ BAŞLAT'}
               </button>
               <button 
                 onClick={() => setSettings(s => ({ ...s, showOriginal: !s.showOriginal }))}
-                className={`py-6 rounded-[1.5rem] text-[12px] font-black border transition-all shadow-xl active:scale-95 ${
+                className={`py-5 rounded-2xl text-[10px] font-black border transition-all active:scale-95 ${
                   settings.showOriginal 
-                    ? 'bg-zinc-800 border-zinc-700 text-zinc-500' 
+                    ? 'bg-zinc-900 border-zinc-700 text-zinc-500' 
                     : 'bg-white text-black border-white shadow-lg'
                 }`}
               >
-                {settings.showOriginal ? 'ORİJİNAL MOD' : 'ÇEVİRİ MODU'}
+                {settings.showOriginal ? 'ORİJİNAL GÖSTER' : 'ÇEVİRİYİ GÖSTER'}
               </button>
            </div>
 
-           {/* Kaydırıcılar */}
-           <div className="space-y-8 px-2">
-              <div className="flex flex-col space-y-3">
-                 <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Yazı Boyutu</span>
+           {/* Ayarlar */}
+           <div className="space-y-6">
+              <div className="flex flex-col space-y-2.5">
+                 <div className="flex justify-between items-center px-1">
+                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Yazı Boyutu</span>
                     <span className="text-blue-500 font-black text-xs">{settings.fontSize}px</span>
                  </div>
                  <input 
-                   type="range" min="14" max="32" 
+                   type="range" min="12" max="36" 
                    value={settings.fontSize} 
                    onChange={(e) => setSettings(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
                    className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none accent-blue-500"
                  />
               </div>
-              <div className="flex flex-col space-y-3">
-                 <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Balon Opasite</span>
+              <div className="flex flex-col space-y-2.5">
+                 <div className="flex justify-between items-center px-1">
+                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Balon Opasite</span>
                     <span className="text-blue-500 font-black text-xs">{Math.round(settings.opacity * 100)}%</span>
                  </div>
                  <input 
-                   type="range" min="0.4" max="1" step="0.05"
+                   type="range" min="0.3" max="1" step="0.05"
                    value={settings.opacity} 
                    onChange={(e) => setSettings(s => ({ ...s, opacity: parseFloat(e.target.value) }))}
                    className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none accent-blue-500"
