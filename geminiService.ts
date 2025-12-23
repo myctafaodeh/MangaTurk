@@ -2,39 +2,54 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { TranslationResult } from "./types";
 
+/**
+ * MangaTurk AI Engine
+ * High-precision OCR and translation using Gemini models.
+ */
 export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
-  // Guidelines uyarınca process.env.API_KEY doğrudan kullanılıyor.
+  // Always initialize with API_KEY from environment variables
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  // Karmaşık diller ve OCR için en güçlü model olan gemini-3-pro-preview tercih edildi.
+  
+  // Use gemini-3-pro-preview for complex reasoning and layout-aware translation
   const modelName = 'gemini-3-pro-preview';
 
   let base64Data = "";
-  if (imageInput.startsWith('data:image')) {
-    base64Data = imageInput.split(',')[1];
-  } else if (imageInput.length > 500) {
-    base64Data = imageInput;
-  } else {
+  try {
+    if (imageInput.startsWith('data:image')) {
+      base64Data = imageInput.split(',')[1];
+    } else if (imageInput.length > 500) {
+      base64Data = imageInput;
+    } else {
+      console.warn("Invalid image data provided.");
+      return { bubbles: [] };
+    }
+  } catch (e) {
+    console.error("Error processing image data:", e);
     return { bubbles: [] };
   }
 
-  // CJK (Chinese, Japanese, Korean) dilleri için optimize edilmiş sistem talimatı
-  const systemInstruction = `Sen profesyonel bir Manga, Manhwa ve Manhua çeviri motorusun. 
-Görseldeki tüm metinleri (konuşma balonları, kutular, anlatımlar) tespit et.
-Özellikle Japonca (JA), Çince (ZH) ve Korece (KO) dillerindeki dikey ve yatay yazıları hatasız algıla.
-Metinleri duygu ve bağlamı koruyarak ${targetLang} diline çevir.
-Yanıtın SADECE aşağıda tanımlanan JSON formatında olmalıdır. Başka hiçbir açıklama yapma.
-Koordinatlar box_2d: [ymin, xmin, ymax, xmax] (0-1000 arası değerler).`;
+  // System instruction optimized for manga/webtoon text detection and translation
+  const systemInstruction = `You are a professional Manga/Webtoon translation engine. 
+Your task is to detect all text in the image (speech bubbles, boxes, sound effects).
+1. Auto-detect source language (focus on Japanese vertical/horizontal text, Korean, Chinese).
+2. Translate text into ${targetLang} contextually.
+3. Return output ONLY in JSON format.
+4. Coordinates should be [ymin, xmin, ymax, xmax] (0-1000).
+Even if no text is found, return a valid JSON with an empty "bubbles" array.`;
 
   try {
+    console.log("Initiating Gemini API request...");
+    
+    // Always use ai.models.generateContent with model name and prompt
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelName,
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/png', data: base64Data } },
-          { text: `Lütfen bu görseldeki tüm metinleri ${targetLang} diline çevir ve koordinatlarını belirle.` }
+          { text: `Detect all foreign text in the image and translate it into ${targetLang}.` }
         ],
       },
       config: {
@@ -48,11 +63,18 @@ Koordinatlar box_2d: [ymin, xmin, ymax, xmax] (0-1000 arası değerler).`;
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  box_2d: { type: Type.ARRAY, items: { type: Type.NUMBER } },
-                  translated_text: { type: Type.STRING },
-                  confidence: { type: Type.NUMBER }
+                  box_2d: { 
+                    type: Type.ARRAY, 
+                    items: { type: Type.NUMBER },
+                    description: "[ymin, xmin, ymax, xmax] 0-1000"
+                  },
+                  translated_text: { 
+                    type: Type.STRING,
+                    description: "The translated text content"
+                  }
                 },
-                required: ["box_2d", "translated_text"]
+                required: ["box_2d", "translated_text"],
+                propertyOrdering: ["box_2d", "translated_text"]
               }
             }
           },
@@ -61,17 +83,24 @@ Koordinatlar box_2d: [ymin, xmin, ymax, xmax] (0-1000 arası değerler).`;
       },
     });
 
-    const text = response.text;
-    if (!text) {
-      console.warn("AI returned empty text");
+    // Directly access the text property as per SDK guidelines (no .text() method)
+    const responseText = response.text;
+    if (!responseText) {
+      throw new Error("Received empty response from API.");
+    }
+
+    const parsed = JSON.parse(responseText.trim());
+    
+    if (!parsed.bubbles || !Array.isArray(parsed.bubbles)) {
+      console.warn("No text bubbles detected in the response.");
       return { bubbles: [] };
     }
-    
-    const parsed = JSON.parse(text.trim());
-    return (parsed && parsed.bubbles ? parsed : { bubbles: [] }) as TranslationResult;
+
+    console.log(`Successfully translated ${parsed.bubbles.length} text elements.`);
+    return parsed as TranslationResult;
 
   } catch (error: any) {
-    console.error("MangaTurk Engine Error:", error);
+    console.error("Gemini Engine Error:", error.message);
     return { bubbles: [] };
   }
 };
