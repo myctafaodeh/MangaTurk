@@ -32,18 +32,14 @@ const App: React.FC = () => {
     if (isProcessing || !settings.isEnabled) return;
     
     setIsProcessing(true);
-    console.log("[MangaTurk] Çeviri başlatılıyor, Y-Pozisyonu:", scrollY);
+    console.log("[MangaTurk-UI] Çeviri motoru aktif edildi.");
 
     try {
-      if (!imageSrc) {
-        console.warn("[MangaTurk] Çevrilecek görsel kaynağı boş.");
-        return;
-      }
+      if (!imageSrc) throw new Error("Görsel kaynağı algılanamadı.");
       
       const result = await translateMangaPage(imageSrc, settings.targetLanguage);
       
-      if (result && result.bubbles && result.bubbles.length > 0) {
-        console.log(`[MangaTurk] ${result.bubbles.length} yeni balon algılandı.`);
+      if (result && result.bubbles) {
         const processed = result.bubbles.map((b) => ({
             ...b,
             id: `b-${Math.random().toString(36).substring(2, 11)}`,
@@ -51,17 +47,15 @@ const App: React.FC = () => {
         }));
 
         setBubbles(prev => {
-           // Eski balonları temizle (bellek yönetimi ve performans için)
-           const currentViewMin = scrollY - 3000;
-           const currentViewMax = scrollY + 5000;
+           // Eski verileri temizleyerek bellek yükünü azalt
+           const currentViewMin = scrollY - 2000;
+           const currentViewMax = scrollY + 4000;
            const filtered = prev.filter(p => (p.absoluteY || 0) > currentViewMin && (p.absoluteY || 0) < currentViewMax);
            return [...filtered, ...processed];
         });
-      } else {
-        console.log("[MangaTurk] Metin bulunamadı.");
       }
-    } catch (err) {
-      console.error("[MangaTurk] Kritik Çeviri Hatası:", err);
+    } catch (err: any) {
+      console.error("[MangaTurk-UI] Çeviri döngüsünde hata:", err.message);
     } finally {
       setIsProcessing(false);
     }
@@ -104,7 +98,7 @@ const App: React.FC = () => {
 
   const onScrollUpdate = useCallback((imgSource: string, scrollY: number, viewHeight: number) => {
     const scrollDiff = Math.abs(scrollY - lastScanY.current);
-    if (scrollDiff > 600) { 
+    if (scrollDiff > 500) { 
       lastScanY.current = scrollY;
       runTranslation(imgSource, scrollY, viewHeight);
     }
@@ -114,23 +108,22 @@ const App: React.FC = () => {
     <div className="w-full h-full relative bg-[#050507]">
       <header className={`app-header transition-all duration-500 ease-out ${isHeaderOpen ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="px-6 h-[80px] flex items-center justify-between">
-           <div className="flex flex-col" onClick={resetToGallery}>
+           <div className="flex flex-col cursor-pointer" onClick={resetToGallery}>
               <h1 className="text-2xl font-black italic tracking-tighter text-white">MANGA<span className="text-blue-500">TURK</span></h1>
               <div className="flex items-center space-x-2">
-                 <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                   !settings.isEnabled ? 'bg-zinc-700' : 
-                   isProcessing ? 'bg-blue-500 shadow-[0_0_15px_#3b82f6] animate-pulse' : 
-                   'bg-green-500 shadow-[0_0_12px_#22c55e]'
+                 <div className={`w-2 h-2 rounded-full ${
+                   isProcessing ? 'bg-blue-500 animate-pulse shadow-[0_0_10px_#3b82f6]' : 
+                   settings.isEnabled ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-zinc-700'
                  }`}></div>
                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                   {isProcessing ? 'ENGINE BUSY' : settings.isEnabled ? 'ONLINE' : 'OFFLINE'}
+                   {isProcessing ? 'AI TRANSLATING' : settings.isEnabled ? 'ENGINE READY' : 'OFFLINE'}
                  </span>
               </div>
            </div>
 
            <div className="flex items-center space-x-3">
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
-              <button onClick={() => { resetToGallery(); fileInputRef.current?.click(); }} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90 transition-all shadow-xl">
+              <button onClick={() => { resetToGallery(); fileInputRef.current?.click(); }} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90 transition-all">
                  <svg className="w-6 h-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               </button>
               <button onClick={() => setIsHeaderOpen(false)} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90">
@@ -147,9 +140,9 @@ const App: React.FC = () => {
                 onChange={(e) => setBrowserUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleNavigate()}
                 className="flex-1 bg-transparent px-3 text-[14px] font-black text-white outline-none placeholder-zinc-700"
-                placeholder="Site URL (örn: mangatrx.com)"
+                placeholder="Manga sitesi URL'si..."
               />
-              <button onClick={handleNavigate} className="bg-blue-600 px-7 py-3.5 rounded-xl text-[10px] font-black shadow-2xl shadow-blue-600/30 uppercase tracking-widest active:scale-95 transition-all">OKU</button>
+              <button onClick={handleNavigate} className="bg-blue-600 px-7 py-3.5 rounded-xl text-[10px] font-black shadow-2xl active:scale-95 transition-all">OKU</button>
            </div>
         </div>
       </header>
