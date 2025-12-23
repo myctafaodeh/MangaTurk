@@ -3,17 +3,17 @@ import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { TranslationResult } from "./types";
 
 /**
- * MangaTurk AI Engine
- * High-precision OCR and translation using Gemini models.
+ * MangaTurk AI Core
+ * Bu modül Japonca, Korece ve Çince metinleri görselden okuyup çevirir.
  */
 export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
-  // Always initialize with API_KEY from environment variables
+  // SDK gereği API_KEY doğrudan process.env üzerinden okunmalı.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Use gemini-3-pro-preview for complex reasoning and layout-aware translation
+  // Karmaşık OCR ve çeviri görevleri için en güçlü model.
   const modelName = 'gemini-3-pro-preview';
 
   let base64Data = "";
@@ -23,33 +23,31 @@ export const translateMangaPage = async (
     } else if (imageInput.length > 500) {
       base64Data = imageInput;
     } else {
-      console.warn("Invalid image data provided.");
+      console.warn("[Gemini] Geçersiz görsel verisi.");
       return { bubbles: [] };
     }
   } catch (e) {
-    console.error("Error processing image data:", e);
+    console.error("[Gemini] Base64 parse hatası:", e);
     return { bubbles: [] };
   }
 
-  // System instruction optimized for manga/webtoon text detection and translation
-  const systemInstruction = `You are a professional Manga/Webtoon translation engine. 
-Your task is to detect all text in the image (speech bubbles, boxes, sound effects).
-1. Auto-detect source language (focus on Japanese vertical/horizontal text, Korean, Chinese).
-2. Translate text into ${targetLang} contextually.
-3. Return output ONLY in JSON format.
-4. Coordinates should be [ymin, xmin, ymax, xmax] (0-1000).
-Even if no text is found, return a valid JSON with an empty "bubbles" array.`;
+  // Manga/Webtoon formatına özel sistem talimatı
+  const systemInstruction = `Sen profesyonel bir Manga/Webtoon OCR ve çeviri motorusun. 
+Görevin: Görseldeki tüm Japonca, Korece, Çince ve İngilizce metinleri tespit et.
+1. Dikey ve yatay metinleri (tategaki/yokogaki) doğru kutulara al.
+2. Metinleri ${targetLang} diline, karakterlerin duygularını koruyarak çevir.
+3. Çıktıyı SADECE JSON formatında ver.
+4. Koordinatlar box_2d: [ymin, xmin, ymax, xmax] şeklinde ve 0-1000 aralığında olmalı.`;
 
   try {
-    console.log("Initiating Gemini API request...");
+    console.log("[Gemini] İstek gönderiliyor...");
     
-    // Always use ai.models.generateContent with model name and prompt
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelName,
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/png', data: base64Data } },
-          { text: `Detect all foreign text in the image and translate it into ${targetLang}.` }
+          { text: `Detect and translate all text to ${targetLang}. Output JSON.` }
         ],
       },
       config: {
@@ -66,15 +64,14 @@ Even if no text is found, return a valid JSON with an empty "bubbles" array.`;
                   box_2d: { 
                     type: Type.ARRAY, 
                     items: { type: Type.NUMBER },
-                    description: "[ymin, xmin, ymax, xmax] 0-1000"
+                    description: "[ymin, xmin, ymax, xmax] normalize values 0-1000"
                   },
                   translated_text: { 
                     type: Type.STRING,
-                    description: "The translated text content"
+                    description: "Translated content in target language"
                   }
                 },
-                required: ["box_2d", "translated_text"],
-                propertyOrdering: ["box_2d", "translated_text"]
+                required: ["box_2d", "translated_text"]
               }
             }
           },
@@ -83,24 +80,24 @@ Even if no text is found, return a valid JSON with an empty "bubbles" array.`;
       },
     });
 
-    // Directly access the text property as per SDK guidelines (no .text() method)
+    // SDK: .text() bir metod değil, bir property'dir.
     const responseText = response.text;
+    
     if (!responseText) {
-      throw new Error("Received empty response from API.");
+      console.error("[Gemini] Boş yanıt.");
+      return { bubbles: [] };
     }
 
     const parsed = JSON.parse(responseText.trim());
     
     if (!parsed.bubbles || !Array.isArray(parsed.bubbles)) {
-      console.warn("No text bubbles detected in the response.");
       return { bubbles: [] };
     }
 
-    console.log(`Successfully translated ${parsed.bubbles.length} text elements.`);
     return parsed as TranslationResult;
 
   } catch (error: any) {
-    console.error("Gemini Engine Error:", error.message);
+    console.error("[Gemini] API Hatası:", error.message);
     return { bubbles: [] };
   }
 };
