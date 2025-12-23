@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { EngineSettings } from '../types';
+import { EngineSettings } from './types';
 
 interface ControlPanelProps {
   settings: EngineSettings;
@@ -8,7 +8,6 @@ interface ControlPanelProps {
   isProcessing: boolean;
 }
 
-// Advanced ControlPanel with floating toggle and comprehensive settings
 const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isProcessing }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -33,7 +32,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isPr
                 isProcessing ? 'bg-blue-500 shadow-[0_0_15px_#3b82f6] animate-pulse' : 
                 'bg-green-500 shadow-[0_0_12px_#22c55e]'
               }`}></div>
-              <span className="text-[11px] font-black text-white uppercase tracking-widest">Engine Control</span>
+              <span className="text-[11px] font-black text-white uppercase tracking-widest">Motor Ayarları</span>
            </div>
            <button onClick={() => setIsOpen(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center active:bg-white/10">
               <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -41,37 +40,34 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isPr
         </div>
 
         <div className="space-y-8">
-           {/* Language Selection */}
            <div className="grid grid-cols-2 gap-3 bg-white/5 p-2 rounded-2xl border border-white/5">
               <div className="flex flex-col text-center">
-                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase tracking-tighter">Source</span>
+                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase tracking-tighter">Kaynak</span>
                  <select 
                    value={settings.sourceLanguage}
                    onChange={(e) => setSettings(s => ({ ...s, sourceLanguage: e.target.value }))}
                    className="bg-transparent py-2 text-sm font-black text-blue-400 outline-none appearance-none text-center cursor-pointer"
                  >
-                   <option value="auto">AUTO DETECT</option>
-                   <option value="Japanese">JAPANESE</option>
-                   <option value="Korean">KOREAN</option>
-                   <option value="Chinese">CHINESE (S)</option>
-                   <option value="Traditional Chinese">CHINESE (T)</option>
-                   <option value="English">ENGLISH</option>
+                   <option value="auto">OTOMATİK</option>
+                   <option value="Japanese">JAPONCA</option>
+                   <option value="Korean">KORECE</option>
+                   <option value="Chinese">ÇİNCE</option>
+                   <option value="English">İNGİLİZCE</option>
                  </select>
               </div>
               <div className="flex flex-col text-center border-l border-white/5">
-                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase tracking-tighter">Target</span>
+                 <span className="text-[9px] font-black text-zinc-500 mb-1 uppercase tracking-tighter">Hedef</span>
                  <select 
                    value={settings.targetLanguage}
                    onChange={(e) => setSettings(s => ({ ...s, targetLanguage: e.target.value }))}
                    className="bg-transparent py-2 text-sm font-black text-white outline-none appearance-none text-center cursor-pointer"
                  >
-                   <option value="Turkish">TURKISH</option>
+                   <option value="Turkish">TÜRKÇE</option>
                    <option value="English">ENGLISH</option>
                  </select>
               </div>
            </div>
 
-           {/* Core Actions */}
            <div className="grid grid-cols-2 gap-4">
               <button 
                 onClick={() => setSettings(s => ({ ...s, isEnabled: !s.isEnabled }))}
@@ -81,7 +77,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isPr
                     : 'bg-green-600 text-white shadow-green-600/20'
                 }`}
               >
-                {settings.isEnabled ? 'STOP ENGINE' : 'START ENGINE'}
+                {settings.isEnabled ? 'MOTORU KAPAT' : 'MOTORU AÇ'}
               </button>
               <button 
                 onClick={() => setSettings(s => ({ ...s, showOriginal: !s.showOriginal }))}
@@ -91,15 +87,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isPr
                     : 'bg-white text-black border-white shadow-lg'
                 }`}
               >
-                {settings.showOriginal ? 'SHOW ORIGINAL' : 'SHOW TRANSLATION'}
+                {settings.showOriginal ? 'ORİJİNAL' : 'ÇEVİRİ'}
               </button>
            </div>
 
-           {/* UI Customization */}
            <div className="space-y-6">
               <div className="flex flex-col space-y-2.5">
                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Font Size</span>
+                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Yazı Boyutu</span>
                     <span className="text-blue-500 font-black text-xs">{settings.fontSize}px</span>
                  </div>
                  <input 
@@ -111,7 +106,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ settings, setSettings, isPr
               </div>
               <div className="flex flex-col space-y-2.5">
                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Bubble Opacity</span>
+                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Şeffaflık</span>
                     <span className="text-blue-500 font-black text-xs">{Math.round(settings.opacity * 100)}%</span>
                  </div>
                  <input 
