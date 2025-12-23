@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
-import MangaViewer from './components/MangaViewer';
-import ControlPanel from './components/ControlPanel';
+import MangaViewer from './MangaViewer';
+import ControlPanel from './ControlPanel';
 import { translateMangaPage } from './geminiService';
 import { SpeechBubble, EngineSettings } from './types';
 
@@ -32,17 +32,18 @@ const App: React.FC = () => {
     if (isProcessing || !settings.isEnabled) return;
     
     setIsProcessing(true);
-    console.log("Çeviri işlemi tetiklendi...");
+    console.log("[MangaTurk] Çeviri başlatılıyor, Y-Pozisyonu:", scrollY);
 
     try {
       if (!imageSrc) {
-        console.warn("Çevrilecek görsel kaynağı bulunamadı.");
+        console.warn("[MangaTurk] Çevrilecek görsel kaynağı boş.");
         return;
       }
       
       const result = await translateMangaPage(imageSrc, settings.targetLanguage);
       
       if (result && result.bubbles && result.bubbles.length > 0) {
+        console.log(`[MangaTurk] ${result.bubbles.length} yeni balon algılandı.`);
         const processed = result.bubbles.map((b) => ({
             ...b,
             id: `b-${Math.random().toString(36).substring(2, 11)}`,
@@ -50,16 +51,17 @@ const App: React.FC = () => {
         }));
 
         setBubbles(prev => {
+           // Eski balonları temizle (bellek yönetimi ve performans için)
            const currentViewMin = scrollY - 3000;
            const currentViewMax = scrollY + 5000;
            const filtered = prev.filter(p => (p.absoluteY || 0) > currentViewMin && (p.absoluteY || 0) < currentViewMax);
            return [...filtered, ...processed];
         });
       } else {
-        console.log("Bu bölgede çevrilecek metin bulunamadı.");
+        console.log("[MangaTurk] Metin bulunamadı.");
       }
     } catch (err) {
-      console.error("Uygulama İçi Çeviri Hatası:", err);
+      console.error("[MangaTurk] Kritik Çeviri Hatası:", err);
     } finally {
       setIsProcessing(false);
     }
@@ -102,8 +104,7 @@ const App: React.FC = () => {
 
   const onScrollUpdate = useCallback((imgSource: string, scrollY: number, viewHeight: number) => {
     const scrollDiff = Math.abs(scrollY - lastScanY.current);
-    // 500px scroll değiştiğinde yeni tarama yap
-    if (scrollDiff > 500) { 
+    if (scrollDiff > 600) { 
       lastScanY.current = scrollY;
       runTranslation(imgSource, scrollY, viewHeight);
     }
@@ -111,8 +112,6 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full relative bg-[#050507]">
-      
-      {/* HEADER */}
       <header className={`app-header transition-all duration-500 ease-out ${isHeaderOpen ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="px-6 h-[80px] flex items-center justify-between">
            <div className="flex flex-col" onClick={resetToGallery}>
@@ -124,7 +123,7 @@ const App: React.FC = () => {
                    'bg-green-500 shadow-[0_0_12px_#22c55e]'
                  }`}></div>
                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                   {isProcessing ? 'ANALYZING...' : settings.isEnabled ? 'ENGINE READY' : 'DISABLED'}
+                   {isProcessing ? 'ENGINE BUSY' : settings.isEnabled ? 'ONLINE' : 'OFFLINE'}
                  </span>
               </div>
            </div>
@@ -148,24 +147,22 @@ const App: React.FC = () => {
                 onChange={(e) => setBrowserUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleNavigate()}
                 className="flex-1 bg-transparent px-3 text-[14px] font-black text-white outline-none placeholder-zinc-700"
-                placeholder="Site adresi (mangatrx.com)"
+                placeholder="Site URL (örn: mangatrx.com)"
               />
-              <button onClick={handleNavigate} className="bg-blue-600 px-7 py-3.5 rounded-xl text-[10px] font-black shadow-2xl shadow-blue-600/30 uppercase tracking-widest active:scale-95 transition-all">GİT</button>
+              <button onClick={handleNavigate} className="bg-blue-600 px-7 py-3.5 rounded-xl text-[10px] font-black shadow-2xl shadow-blue-600/30 uppercase tracking-widest active:scale-95 transition-all">OKU</button>
            </div>
         </div>
       </header>
 
-      {/* FLOATING TOGGLE */}
       {!isHeaderOpen && (
         <button 
           onClick={() => setIsHeaderOpen(true)}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[1100] bg-zinc-900/90 backdrop-blur-3xl border border-white/10 px-10 py-3 rounded-full active:scale-95 transition-all shadow-2xl shadow-black/50"
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[1100] bg-zinc-900/90 backdrop-blur-3xl border border-white/10 px-10 py-3 rounded-full active:scale-95 transition-all shadow-2xl"
         >
           <div className="w-14 h-2 bg-zinc-700 rounded-full"></div>
         </button>
       )}
 
-      {/* MAIN VIEWER */}
       <main className="w-full h-full">
         <MangaViewer 
           bubbles={bubbles} 
