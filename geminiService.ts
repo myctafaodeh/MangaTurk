@@ -6,8 +6,9 @@ export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
+  // En güçlü model gemini-3-pro-preview ile hassas OCR ve çeviri
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  const modelName = 'gemini-3-flash-preview';
+  const modelName = 'gemini-3-pro-preview';
 
   let base64Data = "";
   if (imageInput.startsWith('data:image')) {
@@ -15,13 +16,16 @@ export const translateMangaPage = async (
   } else if (imageInput.length > 500) {
     base64Data = imageInput;
   } else {
+    // URL durumlarında çeviri şimdilik pasif (iframe engeli nedeniyle)
     return { bubbles: [] };
   }
 
-  const systemInstruction = `Sen Manga ve Webtoon çeviri uzmanısın. Görüntüdeki konuşma balonlarını (speech bubbles) tespit et ve içindeki metinleri ${targetLang} diline çevir. 
-  Yanıtın SADECE JSON formatında olmalı. Markdown kullanma. 
-  Koordinatlar [ymin, xmin, ymax, xmax] şeklinde 0-1000 arasında olmalı.
-  JSON Yapısı: {"bubbles": [{"box_2d": [y1, x1, y2, x2], "translated_text": "..."}]}`;
+  // AI'nın sadece JSON döndürmesini sağlayan kesin talimat
+  const systemInstruction = `Sen Manga ve Webtoon çeviri motorusun. 
+Görüntüdeki metinleri (konuşma balonları, anlatımlar) tespit et.
+Metinleri ${targetLang} diline, karakterlerin duygularını koruyarak çevir.
+YANIT SADECE SAF JSON OLMALIDIR. MARKDOWN KULLANMA.
+Koordinatlar box_2d: [ymin, xmin, ymax, xmax] (0-1000 arası değerler).`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -30,13 +34,14 @@ export const translateMangaPage = async (
         {
           parts: [
             { inlineData: { mimeType: 'image/png', data: base64Data } },
-            { text: `Lütfen bu sayfadaki tüm konuşma balonlarını bul ve ${targetLang} diline çevir. Yanıt sadece saf JSON olsun.` }
+            { text: `Görseldeki tüm konuşmaları ${targetLang} diline çevirip koordinatlarıyla ver.` }
           ],
         },
       ],
       config: {
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
+        // YAPISAL ÇIKTI: AI'nın yanlış format döndürmesini engeller
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -53,25 +58,20 @@ export const translateMangaPage = async (
             }
           },
           required: ["bubbles"]
-        }
+        },
+        thinkingConfig: { thinkingBudget: 0 } // Hız için düşünme bütçesi kapalı
       },
     });
 
     const text = response.text;
     if (!text) return { bubbles: [] };
     
-    // JSON Temizleme
-    const cleanJson = text.trim()
-      .replace(/^```json/i, "")
-      .replace(/```$/i, "")
-      .trim();
-
-    const parsed = JSON.parse(cleanJson);
-    console.log("AI Response Parsed:", parsed);
+    // JSON'u güvenli şekilde ayrıştır
+    const parsed = JSON.parse(text.trim());
     return (parsed && parsed.bubbles ? parsed : { bubbles: [] }) as TranslationResult;
 
   } catch (error: any) {
-    console.error("Gemini Translation Error:", error);
+    console.error("Gemini PRO Engine Error:", error);
     return { bubbles: [] };
   }
 };
