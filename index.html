@@ -17,36 +17,31 @@
         }
         #root { width: 100%; height: 100%; }
         
-        /* KESİN ORTALANMIŞ SPLASH SCREEN */
         #splash-screen {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: #050507;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            position: fixed; inset: 0;
+            background: #050507; z-index: 10000;
+            display: flex; flex-direction: column;
+            items: center; justify-content: center;
             text-align: center;
         }
         .pulse-logo {
-            width: 100px; height: 100px; 
+            width: 110px; height: 110px; 
             background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            border-radius: 28px; 
-            display: flex; items: center; justify-content: center;
-            box-shadow: 0 15px 40px rgba(59, 130, 246, 0.4); 
-            animation: logo-zoom 2s infinite ease-in-out;
-            margin-bottom: 2rem;
+            border-radius: 30px; 
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 20px 60px rgba(59, 130, 246, 0.4); 
+            animation: splash-zoom 2.5s infinite ease-in-out;
+            margin: 0 auto 2.5rem auto;
         }
-        @keyframes logo-zoom { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        @keyframes splash-zoom { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.08); filter: brightness(1.3); } }
         
-        .loader-box { width: 180px; height: 4px; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; position: relative; }
-        .loader-bar { position: absolute; left: 0; top: 0; height: 100%; width: 40%; background: #3b82f6; border-radius: 10px; animation: slide 1.2s infinite ease-in-out; }
-        @keyframes slide { 0% { left: -40%; } 100% { left: 100%; } }
+        .loader-track { width: 200px; height: 4px; background: rgba(255,255,255,0.05); border-radius: 10px; margin: 0 auto; overflow: hidden; position: relative; }
+        .loader-fill { position: absolute; left: 0; top: 0; height: 100%; width: 50%; background: #3b82f6; border-radius: 10px; animation: loader-slide 1.5s infinite ease-in-out; }
+        @keyframes loader-slide { 0% { left: -50%; } 100% { left: 100%; } }
 
-        .loading-text { margin-top: 1.5rem; font-size: 11px; font-weight: 900; letter-spacing: 0.4em; color: rgba(255,255,255,0.3); text-transform: uppercase; }
+        .loading-text { margin-top: 1.5rem; font-size: 11px; font-weight: 900; letter-spacing: 0.5em; color: rgba(255,255,255,0.4); text-transform: uppercase; }
 
-        .app-header { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(5,5,7,0.95); backdrop-filter: blur(30px); border-bottom: 1px solid rgba(255,255,255,0.05); padding-top: var(--sat); }
+        .app-header { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(5,5,7,0.98); backdrop-filter: blur(40px); border-bottom: 1px solid rgba(255,255,255,0.05); padding-top: var(--sat); }
         .custom-scroll::-webkit-scrollbar { width: 0; height: 0; }
     </style>
 <script type="importmap">
@@ -58,8 +53,8 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://esm.sh/vite@^7.3.0"
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
@@ -67,11 +62,11 @@
 <body>
     <div id="splash-screen">
         <div class="pulse-logo">
-            <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
-        <h1 class="text-3xl font-black italic tracking-tighter text-white">MANGA<span class="text-blue-500">TURK</span></h1>
-        <div class="loader-box mt-8"><div class="loader-bar"></div></div>
-        <p class="loading-text">Yapay Zeka Motoru Hazır</p>
+        <h1 class="text-4xl font-black italic tracking-tighter text-white">MANGA<span class="text-blue-500">TURK</span></h1>
+        <div class="loader-track mt-10"><div class="loader-fill"></div></div>
+        <p class="loading-text">Engine Initializing</p>
     </div>
     
     <div id="root"></div>
@@ -79,13 +74,13 @@
     <script type="module" src="/index.tsx"></script>
     <script>
         window.addEventListener('load', () => {
-            const splash = document.getElementById('splash-screen');
-            if(splash) { 
+            const ss = document.getElementById('splash-screen');
+            if(ss) { 
                 setTimeout(() => {
-                    splash.style.opacity = '0';
-                    splash.style.transition = 'opacity 0.6s ease-out';
-                    setTimeout(() => splash.remove(), 600);
-                }, 1500);
+                    ss.style.opacity = '0';
+                    ss.style.transition = 'opacity 0.8s ease-out';
+                    setTimeout(() => ss.remove(), 800);
+                }, 1200);
             }
         });
     </script>
