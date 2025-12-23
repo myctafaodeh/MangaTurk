@@ -6,9 +6,9 @@ export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
-  // Initialize AI client using process.env.API_KEY directly as per guidelines.
+  // Guidelines uyarınca process.env.API_KEY doğrudan kullanılıyor.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  // Using gemini-3-pro-preview for complex reasoning/translation tasks.
+  // Karmaşık diller ve OCR için en güçlü model olan gemini-3-pro-preview tercih edildi.
   const modelName = 'gemini-3-pro-preview';
 
   let base64Data = "";
@@ -20,11 +20,13 @@ export const translateMangaPage = async (
     return { bubbles: [] };
   }
 
-  const systemInstruction = `Sen uzman bir Manga/Webtoon çeviri motorusun. 
-Görseldeki tüm konuşma balonlarını ve metinleri bul. 
-Hepsini ${targetLang} diline çevir. 
-Yanıtın sadece JSON formatında olmalı. 
-Koordinatlar [ymin, xmin, ymax, xmax] formatında 0-1000 arası olmalı.`;
+  // CJK (Chinese, Japanese, Korean) dilleri için optimize edilmiş sistem talimatı
+  const systemInstruction = `Sen profesyonel bir Manga, Manhwa ve Manhua çeviri motorusun. 
+Görseldeki tüm metinleri (konuşma balonları, kutular, anlatımlar) tespit et.
+Özellikle Japonca (JA), Çince (ZH) ve Korece (KO) dillerindeki dikey ve yatay yazıları hatasız algıla.
+Metinleri duygu ve bağlamı koruyarak ${targetLang} diline çevir.
+Yanıtın SADECE aşağıda tanımlanan JSON formatında olmalıdır. Başka hiçbir açıklama yapma.
+Koordinatlar box_2d: [ymin, xmin, ymax, xmax] (0-1000 arası değerler).`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -32,7 +34,7 @@ Koordinatlar [ymin, xmin, ymax, xmax] formatında 0-1000 arası olmalı.`;
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/png', data: base64Data } },
-          { text: `Görseldeki metinleri tespit et ve ${targetLang} diline çevir.` }
+          { text: `Lütfen bu görseldeki tüm metinleri ${targetLang} diline çevir ve koordinatlarını belirle.` }
         ],
       },
       config: {
@@ -47,7 +49,8 @@ Koordinatlar [ymin, xmin, ymax, xmax] formatında 0-1000 arası olmalı.`;
                 type: Type.OBJECT,
                 properties: {
                   box_2d: { type: Type.ARRAY, items: { type: Type.NUMBER } },
-                  translated_text: { type: Type.STRING }
+                  translated_text: { type: Type.STRING },
+                  confidence: { type: Type.NUMBER }
                 },
                 required: ["box_2d", "translated_text"]
               }
@@ -58,15 +61,17 @@ Koordinatlar [ymin, xmin, ymax, xmax] formatında 0-1000 arası olmalı.`;
       },
     });
 
-    // Access text property directly from the response.
     const text = response.text;
-    if (!text) return { bubbles: [] };
+    if (!text) {
+      console.warn("AI returned empty text");
+      return { bubbles: [] };
+    }
     
     const parsed = JSON.parse(text.trim());
     return (parsed && parsed.bubbles ? parsed : { bubbles: [] }) as TranslationResult;
 
   } catch (error: any) {
-    console.error("Gemini PRO Engine Error:", error);
+    console.error("MangaTurk Engine Error:", error);
     return { bubbles: [] };
   }
 };
