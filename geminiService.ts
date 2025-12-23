@@ -6,8 +6,9 @@ export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
-  // En güçlü model gemini-3-pro-preview ile hassas OCR ve çeviri
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  // Initialize AI client using process.env.API_KEY directly as per guidelines.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Using gemini-3-pro-preview for complex reasoning/translation tasks.
   const modelName = 'gemini-3-pro-preview';
 
   let base64Data = "";
@@ -16,32 +17,27 @@ export const translateMangaPage = async (
   } else if (imageInput.length > 500) {
     base64Data = imageInput;
   } else {
-    // URL durumlarında çeviri şimdilik pasif (iframe engeli nedeniyle)
     return { bubbles: [] };
   }
 
-  // AI'nın sadece JSON döndürmesini sağlayan kesin talimat
-  const systemInstruction = `Sen Manga ve Webtoon çeviri motorusun. 
-Görüntüdeki metinleri (konuşma balonları, anlatımlar) tespit et.
-Metinleri ${targetLang} diline, karakterlerin duygularını koruyarak çevir.
-YANIT SADECE SAF JSON OLMALIDIR. MARKDOWN KULLANMA.
-Koordinatlar box_2d: [ymin, xmin, ymax, xmax] (0-1000 arası değerler).`;
+  const systemInstruction = `Sen uzman bir Manga/Webtoon çeviri motorusun. 
+Görseldeki tüm konuşma balonlarını ve metinleri bul. 
+Hepsini ${targetLang} diline çevir. 
+Yanıtın sadece JSON formatında olmalı. 
+Koordinatlar [ymin, xmin, ymax, xmax] formatında 0-1000 arası olmalı.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelName,
-      contents: [
-        {
-          parts: [
-            { inlineData: { mimeType: 'image/png', data: base64Data } },
-            { text: `Görseldeki tüm konuşmaları ${targetLang} diline çevirip koordinatlarıyla ver.` }
-          ],
-        },
-      ],
+      contents: {
+        parts: [
+          { inlineData: { mimeType: 'image/png', data: base64Data } },
+          { text: `Görseldeki metinleri tespit et ve ${targetLang} diline çevir.` }
+        ],
+      },
       config: {
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
-        // YAPISAL ÇIKTI: AI'nın yanlış format döndürmesini engeller
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -58,15 +54,14 @@ Koordinatlar box_2d: [ymin, xmin, ymax, xmax] (0-1000 arası değerler).`;
             }
           },
           required: ["bubbles"]
-        },
-        thinkingConfig: { thinkingBudget: 0 } // Hız için düşünme bütçesi kapalı
+        }
       },
     });
 
+    // Access text property directly from the response.
     const text = response.text;
     if (!text) return { bubbles: [] };
     
-    // JSON'u güvenli şekilde ayrıştır
     const parsed = JSON.parse(text.trim());
     return (parsed && parsed.bubbles ? parsed : { bubbles: [] }) as TranslationResult;
 
