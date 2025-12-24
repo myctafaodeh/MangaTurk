@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const [browserUrl, setBrowserUrl] = useState<string>("mangatrx.com");
   const [activeUrl, setActiveUrl] = useState<string>("");
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
-  const [lastError, setLastError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastScanY = useRef<number>(-9999);
@@ -30,23 +30,17 @@ const App: React.FC = () => {
   });
 
   const runTranslation = async (imageSrc: string, scrollY: number, viewHeight: number) => {
-    // Sadece geçerli görsel verisi (base64) varsa devam et
-    if (isProcessing || !settings.isEnabled || !imageSrc || imageSrc.length < 500) {
+    // URL kontrolü: Sadece resim verisi (data:image) varsa Gemini'ye gönder
+    if (isProcessing || !settings.isEnabled || !imageSrc || !imageSrc.startsWith('data:image')) {
       return;
     }
     
     setIsProcessing(true);
-    setLastError(null);
-    console.log("[MangaTurk] Çeviri başlatılıyor...");
+    setErrorMsg(null);
 
     try {
       const result = await translateMangaPage(imageSrc, settings.targetLanguage);
-      
       if (result && result.bubbles) {
-        if (result.bubbles.length === 0) {
-          console.warn("[MangaTurk] Görselde metin tespit edilemedi.");
-        }
-
         const processed = result.bubbles.map((b) => ({
             ...b,
             id: `b-${Math.random().toString(36).substring(2, 11)}`,
@@ -54,7 +48,6 @@ const App: React.FC = () => {
         }));
 
         setBubbles(prev => {
-           // Bellek optimizasyonu
            const currentViewMin = scrollY - 2000;
            const currentViewMax = scrollY + 4000;
            const filtered = prev.filter(p => (p.absoluteY || 0) > currentViewMin && (p.absoluteY || 0) < currentViewMax);
@@ -62,40 +55,28 @@ const App: React.FC = () => {
         });
       }
     } catch (err: any) {
-      console.error("[MangaTurk-UI] Hata:", err.message);
-      setLastError(err.message || "İşlem sırasında bir hata oluştu.");
-      setTimeout(() => setLastError(null), 5000);
+      console.error("[APP] Çeviri Hatası:", err.message);
+      setErrorMsg(err.message.includes("API_KEY") ? "API Anahtarı bulunamadı." : "Çeviri sırasında sorun oluştu.");
+      setTimeout(() => setErrorMsg(null), 5000);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const resetToGallery = () => {
-    setActiveUrl("");
-    setBubbles([]);
-    setCustomImage(null);
-    setIsHeaderOpen(true);
-    setLastError(null);
-    lastScanY.current = -9999;
-  };
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      console.log("[MangaTurk] Dosya yükleniyor:", file.name);
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
         if (base64) {
-          setActiveUrl("");
           setCustomImage(base64);
+          setActiveUrl("");
           setBubbles([]);
           setIsHeaderOpen(false);
-          // Doğrudan çeviriyi başlat
           runTranslation(base64, 0, window.innerHeight);
         }
       };
-      reader.onerror = () => setLastError("Dosya okunamadı.");
       reader.readAsDataURL(file);
     }
   };
@@ -104,7 +85,6 @@ const App: React.FC = () => {
     let url = browserUrl.trim();
     if (!url) return;
     if (!url.startsWith('http')) url = 'https://' + url;
-    
     setCustomImage(null);
     setBubbles([]);
     setActiveUrl(url);
@@ -112,9 +92,7 @@ const App: React.FC = () => {
   };
 
   const onScrollUpdate = useCallback((imgSource: string, scrollY: number, viewHeight: number) => {
-    // Sadece base64 verisi varsa çeviriyi tetikle (URL'leri atla)
-    if (!imgSource || !imgSource.startsWith('data:image')) return;
-
+    if (!imgSource.startsWith('data:image')) return;
     const scrollDiff = Math.abs(scrollY - lastScanY.current);
     if (scrollDiff > 600) { 
       lastScanY.current = scrollY;
@@ -123,61 +101,52 @@ const App: React.FC = () => {
   }, [settings.isEnabled, isProcessing, settings.targetLanguage]);
 
   return (
-    <div className="w-full h-full relative bg-[#050507]">
-      <header className={`app-header transition-all duration-500 ease-out ${isHeaderOpen ? 'translate-y-0' : '-translate-y-full'}`}>
-        <div className="px-6 h-[80px] flex items-center justify-between">
-           <div className="flex flex-col cursor-pointer" onClick={resetToGallery}>
-              <h1 className="text-2xl font-black italic tracking-tighter text-white">MANGA<span className="text-blue-500">TURK</span></h1>
-              <div className="flex items-center space-x-2">
-                 <div className={`w-2.5 h-2.5 rounded-full ${
-                   isProcessing ? 'bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 
-                   lastError ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 
-                   settings.isEnabled ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-zinc-700'
-                 }`}></div>
-                 <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                   {isProcessing ? 'ANALYZING' : lastError ? 'ERROR' : settings.isEnabled ? 'READY' : 'OFFLINE'}
-                 </span>
+    <div className="w-full h-full relative bg-[#050507] overflow-hidden">
+      {/* HEADER */}
+      <header className={`app-header transition-all duration-500 transform ${isHeaderOpen ? 'translate-y-0' : '-translate-y-full'}`}>
+        <div className="px-6 h-[75px] flex items-center justify-between">
+           <div className="flex flex-col cursor-pointer" onClick={() => { setActiveUrl(""); setCustomImage(null); setBubbles([]); setIsHeaderOpen(true); }}>
+              <h1 className="text-2xl font-black italic text-white leading-none">MANGA<span className="text-blue-500">TURK</span></h1>
+              <div className="flex items-center space-x-2 mt-1">
+                 <div className={`w-2 h-2 rounded-full ${isProcessing ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`}></div>
+                 <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{isProcessing ? 'AI TRANSLATING' : 'READY'}</span>
               </div>
            </div>
-
            <div className="flex items-center space-x-3">
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
-              <button onClick={() => { resetToGallery(); fileInputRef.current?.click(); }} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90 transition-all shadow-xl">
-                 <svg className="w-6 h-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <button onClick={() => fileInputRef.current?.click()} className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-white/10 active:scale-90 transition-all">
+                 <svg className="w-5 h-5 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
               </button>
-              <button onClick={() => setIsHeaderOpen(false)} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90">
-                 <svg className="w-6 h-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
+              <button onClick={() => setIsHeaderOpen(false)} className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-white/10 active:scale-90 transition-all">
+                 <svg className="w-5 h-5 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
               </button>
            </div>
         </div>
-
-        <div className="px-6 pb-6">
-           <div className="flex items-center space-x-3 bg-black/50 border border-white/10 rounded-[1.25rem] p-2.5">
+        <div className="px-6 pb-5">
+           <div className="flex items-center space-x-3 bg-zinc-900/50 border border-white/5 rounded-2xl p-2">
               <input 
-                type="text" 
-                value={browserUrl} 
+                type="text" value={browserUrl} 
                 onChange={(e) => setBrowserUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleNavigate()}
-                className="flex-1 bg-transparent px-3 text-[14px] font-black text-white outline-none placeholder-zinc-700"
+                className="flex-1 bg-transparent px-3 text-xs font-bold text-white outline-none placeholder-zinc-700"
                 placeholder="Örn: mangatrx.com"
               />
-              <button onClick={handleNavigate} className="bg-blue-600 px-7 py-3.5 rounded-xl text-[10px] font-black shadow-2xl active:scale-95 transition-all">OKU</button>
+              <button onClick={handleNavigate} className="bg-blue-600 px-5 py-2.5 rounded-xl text-[10px] font-black active:scale-95 transition-all">GİT</button>
            </div>
         </div>
       </header>
 
-      {lastError && (
-        <div className="fixed top-24 left-6 right-6 z-[1200] bg-red-600/95 backdrop-blur-xl p-4 rounded-2xl border border-red-500/20 shadow-2xl animate-in slide-in-from-top-4">
-           <p className="text-[10px] font-black text-white uppercase tracking-widest text-center leading-relaxed">{lastError}</p>
+      {/* ERROR TOAST */}
+      {errorMsg && (
+        <div className="fixed top-24 left-6 right-6 z-[1200] bg-red-600 p-4 rounded-xl border border-red-500 shadow-2xl animate-bounce">
+           <p className="text-[10px] font-black text-white text-center uppercase tracking-widest">{errorMsg}</p>
         </div>
       )}
 
+      {/* RE-OPEN BUTTON */}
       {!isHeaderOpen && (
-        <button 
-          onClick={() => setIsHeaderOpen(true)}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[1100] bg-zinc-900/90 backdrop-blur-3xl border border-white/10 px-10 py-3 rounded-full active:scale-95 transition-all shadow-2xl"
-        >
-          <div className="w-14 h-2 bg-zinc-700 rounded-full"></div>
+        <button onClick={() => setIsHeaderOpen(true)} className="fixed top-4 left-1/2 -translate-x-1/2 z-[1100] bg-zinc-900/80 backdrop-blur-xl border border-white/10 px-8 py-2 rounded-full shadow-2xl active:scale-95 transition-all">
+          <div className="w-10 h-1 bg-zinc-700 rounded-full"></div>
         </button>
       )}
 
