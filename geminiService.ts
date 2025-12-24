@@ -3,17 +3,17 @@ import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { TranslationResult } from "./types";
 
 /**
- * MangaTurk AI PRO - Çeviri Motoru
- * Kritik: Tüm metinleri istisnasız hedef dile çevirir.
+ * MangaTurk AI PRO Engine
+ * APK ortamında yüksek kararlılık ve zorunlu çeviri protokolü.
  */
 export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
-  // Guidelines: API anahtarını doğrudan process.env'den al
+  // APK ortamında process.env.API_KEY otomatik olarak inject edilir.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // En gelişmiş çeviri ve OCR kabiliyeti için Pro model
+  // En yüksek doğruluk ve OCR başarısı için Pro model kullanılır.
   const modelName = 'gemini-3-pro-preview';
 
   let base64Data = "";
@@ -23,32 +23,32 @@ export const translateMangaPage = async (
     } else if (imageInput.length > 500) {
       base64Data = imageInput;
     } else {
-      throw new Error("Görsel verisi eksik veya hatalı.");
+      throw new Error("Geçersiz görsel verisi.");
     }
   } catch (e: any) {
-    console.error("[MangaTurk-Engine] Input Hatası:", e.message);
+    console.error("[ENGINE-ERR] Görsel işleme hatası:", e.message);
     return { bubbles: [] };
   }
 
-  // Kesin talimatlar: İngilizce dahil her şeyi çevir, asla sessiz kalma.
-  const systemInstruction = `You are a professional Manga/Webtoon translation engine.
-Your absolute rules:
-1. Detect ALL text in the provided image (Japanese vertical/horizontal, English, sound effects, narrative).
-2. Translate EVERY detected text to ${targetLang}. 
-3. IMPORTANT: DO NOT skip English text. Even if the text is already English, translate it into ${targetLang}.
-4. Output MUST be a valid JSON. 
-5. Coordinates must be [ymin, xmin, ymax, xmax] in 0-1000 scale.
-6. DO NOT explain the translation. DO NOT summarize. Only return the translated text.`;
+  // ZORUNLU TALİMAT: İngilizce olsa bile çevir, asla sessiz kalma.
+  const systemInstruction = `You are a professional translation engine for Manga and Webtoons.
+STRICT RULES:
+1. Detect ALL text in the image (Japanese, Korean, Chinese, and ESPECIALLY English).
+2. Translate EVERY detected text into ${targetLang}. 
+3. DO NOT skip English text. Even if the text is already English, you MUST translate it into ${targetLang}.
+4. DO NOT summarize. DO NOT add notes. Only return the translated text in the JSON structure.
+5. Coordinates: [ymin, xmin, ymax, xmax] on a 0-1000 scale.
+6. If the image contains text, you MUST produce a translation. Failing to translate is not an option.`;
 
   try {
-    console.log(`[MangaTurk-Engine] İstek başlatılıyor: ${targetLang} diline çeviri...`);
+    console.log(`[ENGINE-LOG] İstek gönderiliyor: Model=${modelName}, Hedef=${targetLang}`);
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelName,
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/png', data: base64Data } },
-          { text: `Görseldeki tüm yabancı ve İngilizce metinleri tespit et ve ${targetLang} diline çevir.` }
+          { text: `Detect all text and translate to ${targetLang}. Output JSON.` }
         ],
       },
       config: {
@@ -65,15 +65,11 @@ Your absolute rules:
                   box_2d: { 
                     type: Type.ARRAY, 
                     items: { type: Type.NUMBER },
-                    description: "[ymin, xmin, ymax, xmax] normalize 0-1000"
+                    description: "Coordinates [ymin, xmin, ymax, xmax]"
                   },
                   translated_text: { 
                     type: Type.STRING,
-                    description: "Translated content. Mandatory output."
-                  },
-                  original_text: {
-                    type: Type.STRING,
-                    description: "Detected original text"
+                    description: "Mandatory translation"
                   }
                 },
                 required: ["box_2d", "translated_text"]
@@ -85,36 +81,30 @@ Your absolute rules:
       },
     });
 
-    // .text property'si doğrudan yanıtı döndürür (metot değildir)
+    // response.text property'si candidates[0].content.parts[0].text içeriğini getirir.
     const responseText = response.text;
     
-    console.group("[MangaTurk-Engine] API Yanıt Detayı");
-    console.log("Raw Response:", responseText);
-    console.groupEnd();
-
-    if (!responseText) {
-      throw new Error("API'den boş yanıt (Empty Response) döndü.");
+    if (!responseText || responseText.trim() === "") {
+      console.error("[ENGINE-ERR] API boş yanıt döndürdü.");
+      throw new Error("API_EMPTY_RESPONSE");
     }
+
+    console.log("[ENGINE-LOG] Ham Yanıt Alındı:", responseText);
 
     const parsed = JSON.parse(responseText.trim());
     
     if (!parsed.bubbles || !Array.isArray(parsed.bubbles)) {
-      throw new Error("JSON parse başarılı ancak bubbles dizisi bulunamadı.");
-    }
-
-    if (parsed.bubbles.length === 0) {
-      console.warn("[MangaTurk-Engine] Görselde metin tespit edilemedi.");
+      throw new Error("INVALID_JSON_STRUCTURE");
     }
 
     return parsed as TranslationResult;
 
   } catch (error: any) {
-    console.error("[MangaTurk-Engine] Kritik Hata:", {
+    console.error("[ENGINE-CRITICAL] Çeviri Zinciri Kırıldı:", {
       message: error.message,
-      status: error.status || "N/A",
-      stack: error.stack
+      code: error.status || "UNKNOWN"
     });
-    // Sessiz kalma, hatayı fırlat ki UI bilsin
+    // Hata durumunda sessiz kalma, hatayı yukarı fırlat
     throw error;
   }
 };
