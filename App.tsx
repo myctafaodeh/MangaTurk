@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const [browserUrl, setBrowserUrl] = useState<string>("mangatrx.com");
   const [activeUrl, setActiveUrl] = useState<string>("");
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
-  const [engineError, setEngineError] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastScanY = useRef<number>(-9999);
@@ -30,21 +30,23 @@ const App: React.FC = () => {
   });
 
   const runTranslation = async (imageSrc: string, scrollY: number, viewHeight: number) => {
-    if (isProcessing || !settings.isEnabled) return;
+    // Sadece geçerli görsel verisi (base64) varsa devam et
+    if (isProcessing || !settings.isEnabled || !imageSrc || imageSrc.length < 500) {
+      return;
+    }
     
     setIsProcessing(true);
-    setEngineError(null);
-    console.log("[APP-LOG] Çeviri işlemi başlatıldı...");
+    setLastError(null);
+    console.log("[MangaTurk] Çeviri başlatılıyor...");
 
     try {
-      if (!imageSrc || imageSrc.length < 100) {
-        throw new Error("Görsel verisi eksik.");
-      }
-      
       const result = await translateMangaPage(imageSrc, settings.targetLanguage);
       
-      if (result && result.bubbles && result.bubbles.length > 0) {
-        console.log(`[APP-LOG] ${result.bubbles.length} metin başarıyla çevrildi.`);
+      if (result && result.bubbles) {
+        if (result.bubbles.length === 0) {
+          console.warn("[MangaTurk] Görselde metin tespit edilemedi.");
+        }
+
         const processed = result.bubbles.map((b) => ({
             ...b,
             id: `b-${Math.random().toString(36).substring(2, 11)}`,
@@ -52,18 +54,17 @@ const App: React.FC = () => {
         }));
 
         setBubbles(prev => {
-           const currentViewMin = scrollY - 2500;
-           const currentViewMax = scrollY + 4500;
+           // Bellek optimizasyonu
+           const currentViewMin = scrollY - 2000;
+           const currentViewMax = scrollY + 4000;
            const filtered = prev.filter(p => (p.absoluteY || 0) > currentViewMin && (p.absoluteY || 0) < currentViewMax);
            return [...filtered, ...processed];
         });
-      } else {
-        console.warn("[APP-LOG] Görselde metin bulunamadı.");
-        // Metin bulunamadığında kullanıcıyı bilgilendirmek için ufak bir state kullanılabilir
       }
     } catch (err: any) {
-      console.error("[APP-LOG] Kritik Çeviri Hatası:", err.message);
-      setEngineError(err.message === "API_EMPTY_RESPONSE" ? "Sunucudan yanıt alınamadı. İnternet bağlantınızı kontrol edin." : "Çeviri sırasında hata oluştu.");
+      console.error("[MangaTurk-UI] Hata:", err.message);
+      setLastError(err.message || "İşlem sırasında bir hata oluştu.");
+      setTimeout(() => setLastError(null), 5000);
     } finally {
       setIsProcessing(false);
     }
@@ -74,28 +75,27 @@ const App: React.FC = () => {
     setBubbles([]);
     setCustomImage(null);
     setIsHeaderOpen(true);
-    setEngineError(null);
+    setLastError(null);
     lastScanY.current = -9999;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      console.log("[APP-LOG] Dosya seçildi:", file.name);
+      console.log("[MangaTurk] Dosya yükleniyor:", file.name);
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
-        if (!base64) {
-          console.error("[APP-LOG] Dosya okunamadı.");
-          return;
+        if (base64) {
+          setActiveUrl("");
+          setCustomImage(base64);
+          setBubbles([]);
+          setIsHeaderOpen(false);
+          // Doğrudan çeviriyi başlat
+          runTranslation(base64, 0, window.innerHeight);
         }
-        setActiveUrl("");
-        setCustomImage(base64);
-        setBubbles([]);
-        setIsHeaderOpen(false);
-        runTranslation(base64, 0, window.innerHeight);
       };
-      reader.onerror = () => console.error("[APP-LOG] FileReader hatası.");
+      reader.onerror = () => setLastError("Dosya okunamadı.");
       reader.readAsDataURL(file);
     }
   };
@@ -112,6 +112,9 @@ const App: React.FC = () => {
   };
 
   const onScrollUpdate = useCallback((imgSource: string, scrollY: number, viewHeight: number) => {
+    // Sadece base64 verisi varsa çeviriyi tetikle (URL'leri atla)
+    if (!imgSource || !imgSource.startsWith('data:image')) return;
+
     const scrollDiff = Math.abs(scrollY - lastScanY.current);
     if (scrollDiff > 600) { 
       lastScanY.current = scrollY;
@@ -127,12 +130,12 @@ const App: React.FC = () => {
               <h1 className="text-2xl font-black italic tracking-tighter text-white">MANGA<span className="text-blue-500">TURK</span></h1>
               <div className="flex items-center space-x-2">
                  <div className={`w-2.5 h-2.5 rounded-full ${
-                   isProcessing ? 'bg-blue-500 animate-pulse' : 
-                   engineError ? 'bg-red-500' : 
-                   settings.isEnabled ? 'bg-green-500' : 'bg-zinc-700'
+                   isProcessing ? 'bg-blue-500 animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 
+                   lastError ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 
+                   settings.isEnabled ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-zinc-700'
                  }`}></div>
                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                   {isProcessing ? 'AI TRANSLATING' : engineError ? 'ENGINE ERROR' : settings.isEnabled ? 'ENGINE READY' : 'OFFLINE'}
+                   {isProcessing ? 'ANALYZING' : lastError ? 'ERROR' : settings.isEnabled ? 'READY' : 'OFFLINE'}
                  </span>
               </div>
            </div>
@@ -156,16 +159,16 @@ const App: React.FC = () => {
                 onChange={(e) => setBrowserUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleNavigate()}
                 className="flex-1 bg-transparent px-3 text-[14px] font-black text-white outline-none placeholder-zinc-700"
-                placeholder="Manga sitesi veya URL..."
+                placeholder="Örn: mangatrx.com"
               />
               <button onClick={handleNavigate} className="bg-blue-600 px-7 py-3.5 rounded-xl text-[10px] font-black shadow-2xl active:scale-95 transition-all">OKU</button>
            </div>
         </div>
       </header>
 
-      {engineError && (
-        <div className="fixed top-24 left-6 right-6 z-[1200] bg-red-600/90 backdrop-blur-xl p-4 rounded-2xl border border-red-500/20 shadow-2xl animate-in slide-in-from-top-4">
-           <p className="text-[11px] font-black text-white uppercase tracking-widest text-center">{engineError}</p>
+      {lastError && (
+        <div className="fixed top-24 left-6 right-6 z-[1200] bg-red-600/95 backdrop-blur-xl p-4 rounded-2xl border border-red-500/20 shadow-2xl animate-in slide-in-from-top-4">
+           <p className="text-[10px] font-black text-white uppercase tracking-widest text-center leading-relaxed">{lastError}</p>
         </div>
       )}
 
