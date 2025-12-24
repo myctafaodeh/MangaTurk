@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [browserUrl, setBrowserUrl] = useState<string>("mangatrx.com");
   const [activeUrl, setActiveUrl] = useState<string>("");
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
+  const [engineError, setEngineError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastScanY = useRef<number>(-9999);
@@ -32,14 +33,18 @@ const App: React.FC = () => {
     if (isProcessing || !settings.isEnabled) return;
     
     setIsProcessing(true);
-    console.log("[MangaTurk-UI] Çeviri motoru aktif edildi.");
+    setEngineError(null);
+    console.log("[APP-LOG] Çeviri işlemi başlatıldı...");
 
     try {
-      if (!imageSrc) throw new Error("Görsel kaynağı algılanamadı.");
+      if (!imageSrc || imageSrc.length < 100) {
+        throw new Error("Görsel verisi eksik.");
+      }
       
       const result = await translateMangaPage(imageSrc, settings.targetLanguage);
       
-      if (result && result.bubbles) {
+      if (result && result.bubbles && result.bubbles.length > 0) {
+        console.log(`[APP-LOG] ${result.bubbles.length} metin başarıyla çevrildi.`);
         const processed = result.bubbles.map((b) => ({
             ...b,
             id: `b-${Math.random().toString(36).substring(2, 11)}`,
@@ -47,15 +52,18 @@ const App: React.FC = () => {
         }));
 
         setBubbles(prev => {
-           // Eski verileri temizleyerek bellek yükünü azalt
-           const currentViewMin = scrollY - 2000;
-           const currentViewMax = scrollY + 4000;
+           const currentViewMin = scrollY - 2500;
+           const currentViewMax = scrollY + 4500;
            const filtered = prev.filter(p => (p.absoluteY || 0) > currentViewMin && (p.absoluteY || 0) < currentViewMax);
            return [...filtered, ...processed];
         });
+      } else {
+        console.warn("[APP-LOG] Görselde metin bulunamadı.");
+        // Metin bulunamadığında kullanıcıyı bilgilendirmek için ufak bir state kullanılabilir
       }
     } catch (err: any) {
-      console.error("[MangaTurk-UI] Çeviri döngüsünde hata:", err.message);
+      console.error("[APP-LOG] Kritik Çeviri Hatası:", err.message);
+      setEngineError(err.message === "API_EMPTY_RESPONSE" ? "Sunucudan yanıt alınamadı. İnternet bağlantınızı kontrol edin." : "Çeviri sırasında hata oluştu.");
     } finally {
       setIsProcessing(false);
     }
@@ -66,21 +74,28 @@ const App: React.FC = () => {
     setBubbles([]);
     setCustomImage(null);
     setIsHeaderOpen(true);
+    setEngineError(null);
     lastScanY.current = -9999;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log("[APP-LOG] Dosya seçildi:", file.name);
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
+        if (!base64) {
+          console.error("[APP-LOG] Dosya okunamadı.");
+          return;
+        }
         setActiveUrl("");
         setCustomImage(base64);
         setBubbles([]);
         setIsHeaderOpen(false);
         runTranslation(base64, 0, window.innerHeight);
       };
+      reader.onerror = () => console.error("[APP-LOG] FileReader hatası.");
       reader.readAsDataURL(file);
     }
   };
@@ -98,7 +113,7 @@ const App: React.FC = () => {
 
   const onScrollUpdate = useCallback((imgSource: string, scrollY: number, viewHeight: number) => {
     const scrollDiff = Math.abs(scrollY - lastScanY.current);
-    if (scrollDiff > 500) { 
+    if (scrollDiff > 600) { 
       lastScanY.current = scrollY;
       runTranslation(imgSource, scrollY, viewHeight);
     }
@@ -111,19 +126,20 @@ const App: React.FC = () => {
            <div className="flex flex-col cursor-pointer" onClick={resetToGallery}>
               <h1 className="text-2xl font-black italic tracking-tighter text-white">MANGA<span className="text-blue-500">TURK</span></h1>
               <div className="flex items-center space-x-2">
-                 <div className={`w-2 h-2 rounded-full ${
-                   isProcessing ? 'bg-blue-500 animate-pulse shadow-[0_0_10px_#3b82f6]' : 
-                   settings.isEnabled ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-zinc-700'
+                 <div className={`w-2.5 h-2.5 rounded-full ${
+                   isProcessing ? 'bg-blue-500 animate-pulse' : 
+                   engineError ? 'bg-red-500' : 
+                   settings.isEnabled ? 'bg-green-500' : 'bg-zinc-700'
                  }`}></div>
                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                   {isProcessing ? 'AI TRANSLATING' : settings.isEnabled ? 'ENGINE READY' : 'OFFLINE'}
+                   {isProcessing ? 'AI TRANSLATING' : engineError ? 'ENGINE ERROR' : settings.isEnabled ? 'ENGINE READY' : 'OFFLINE'}
                  </span>
               </div>
            </div>
 
            <div className="flex items-center space-x-3">
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
-              <button onClick={() => { resetToGallery(); fileInputRef.current?.click(); }} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90 transition-all">
+              <button onClick={() => { resetToGallery(); fileInputRef.current?.click(); }} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90 transition-all shadow-xl">
                  <svg className="w-6 h-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               </button>
               <button onClick={() => setIsHeaderOpen(false)} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/10 active:scale-90">
@@ -140,12 +156,18 @@ const App: React.FC = () => {
                 onChange={(e) => setBrowserUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleNavigate()}
                 className="flex-1 bg-transparent px-3 text-[14px] font-black text-white outline-none placeholder-zinc-700"
-                placeholder="Manga sitesi URL'si..."
+                placeholder="Manga sitesi veya URL..."
               />
               <button onClick={handleNavigate} className="bg-blue-600 px-7 py-3.5 rounded-xl text-[10px] font-black shadow-2xl active:scale-95 transition-all">OKU</button>
            </div>
         </div>
       </header>
+
+      {engineError && (
+        <div className="fixed top-24 left-6 right-6 z-[1200] bg-red-600/90 backdrop-blur-xl p-4 rounded-2xl border border-red-500/20 shadow-2xl animate-in slide-in-from-top-4">
+           <p className="text-[11px] font-black text-white uppercase tracking-widest text-center">{engineError}</p>
+        </div>
+      )}
 
       {!isHeaderOpen && (
         <button 
