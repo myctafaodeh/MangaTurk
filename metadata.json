@@ -1,13 +1,15 @@
-
 {
-  "name": "MangaTurk Mobile AI",
-  "short_name": "MangaTurk",
-  "description": "Android tabanlı gerçek zamanlı manga çeviri aracı.",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#050507",
-  "theme_color": "#050507",
   "requestFramePermissions": [
-    "camera"
-  ]
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "android": {
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.READ_MEDIA_IMAGES"
+    ]
+  }
 }
