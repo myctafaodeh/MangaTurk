@@ -4,16 +4,17 @@ import { TranslationResult } from "./types";
 
 /**
  * MangaTurk AI PRO Engine
- * APK ortamında yüksek kararlılık ve zorunlu çeviri protokolü.
+ * APK ortamında yüksek kararlılık ve kesin çeviri protokolü.
+ * Bu modül İngilizce dahil tüm metinleri istisnasız çevirir.
  */
 export const translateMangaPage = async (
   imageInput: string,
   targetLang: string,
 ): Promise<TranslationResult> => {
-  // APK ortamında process.env.API_KEY otomatik olarak inject edilir.
+  // API anahtarı güvenli ortam değişkeninden (process.env.API_KEY) alınır.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // En yüksek doğruluk ve OCR başarısı için Pro model kullanılır.
+  // En yüksek doğruluk ve karmaşık OCR başarısı için Pro model.
   const modelName = 'gemini-3-pro-preview';
 
   let base64Data = "";
@@ -21,34 +22,65 @@ export const translateMangaPage = async (
     if (imageInput.startsWith('data:image')) {
       base64Data = imageInput.split(',')[1];
     } else if (imageInput.length > 500) {
+      // Base64 ham veri gelmiş olabilir
       base64Data = imageInput;
     } else {
-      throw new Error("Geçersiz görsel verisi.");
+      // Eğer bir URL gelmişse veya veri çok kısaysa hata fırlat
+      throw new Error("Görsel verisi geçersiz veya çok kısa (URL gönderilmiş olabilir).");
     }
   } catch (e: any) {
-    console.error("[ENGINE-ERR] Görsel işleme hatası:", e.message);
-    return { bubbles: [] };
+    console.error("[MangaTurk-Engine] Input Hatası:", e.message);
+    throw e;
   }
 
-  // ZORUNLU TALİMAT: İngilizce olsa bile çevir, asla sessiz kalma.
-  const systemInstruction = `You are a professional translation engine for Manga and Webtoons.
-STRICT RULES:
-1. Detect ALL text in the image (Japanese, Korean, Chinese, and ESPECIALLY English).
-2. Translate EVERY detected text into ${targetLang}. 
-3. DO NOT skip English text. Even if the text is already English, you MUST translate it into ${targetLang}.
-4. DO NOT summarize. DO NOT add notes. Only return the translated text in the JSON structure.
-5. Coordinates: [ymin, xmin, ymax, xmax] on a 0-1000 scale.
-6. If the image contains text, you MUST produce a translation. Failing to translate is not an option.`;
+  // ZORUNLU TALİMAT: Kullanıcının talep ettiği katı kuralları uygula.
+  const systemInstruction = `You are a professional OCR and translation engine for Manga and Webtoon images.
+Your task is NOT optional.
+
+STRICT RULES — FOLLOW ALL OF THEM:
+
+1. Detect ALL visible text in the image.
+   This includes Japanese, Korean, Chinese, English, numbers, sound effects, signs, UI text, and small background text.
+
+2. Translate EVERY detected text into the target language: ${targetLang}.
+   - Even if the text is already English, you MUST translate it.
+   - Never keep the original language.
+
+3. NEVER skip text.
+   Skipping text, ignoring text, or partially translating is a FAILURE.
+
+4. NEVER summarize.
+   NEVER explain.
+   NEVER add notes.
+   NEVER add comments.
+   Output ONLY the required JSON.
+
+5. Output MUST be valid JSON and MUST follow the schema exactly.
+
+6. If NO text is detected, return:
+   { "bubbles": [] }
+   You are NOT allowed to return an empty response.
+
+7. Each detected text block MUST include:
+   - box_2d: [ymin, xmin, ymax, xmax] scaled from 0 to 1000
+   - translated_text: fully translated string
+
+8. Coordinates must reflect the real position of the text in the image.
+   Do NOT guess randomly.
+
+9. You are FORBIDDEN from refusing, staying silent, or returning partial data.
+
+10. Failure to output valid JSON is NOT acceptable.`;
 
   try {
-    console.log(`[ENGINE-LOG] İstek gönderiliyor: Model=${modelName}, Hedef=${targetLang}`);
-
+    console.log(`[MangaTurk-Engine] İstek: Model=${modelName}, Hedef=${targetLang}`);
+    
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelName,
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/png', data: base64Data } },
-          { text: `Detect all text and translate to ${targetLang}. Output JSON.` }
+          { text: `Görseldeki her şeyi tespit et ve ${targetLang} diline çevir. Çıktı formatı kesinlikle JSON olmalı.` }
         ],
       },
       config: {
@@ -65,11 +97,11 @@ STRICT RULES:
                   box_2d: { 
                     type: Type.ARRAY, 
                     items: { type: Type.NUMBER },
-                    description: "Coordinates [ymin, xmin, ymax, xmax]"
+                    description: "[ymin, xmin, ymax, xmax] coordinates"
                   },
                   translated_text: { 
                     type: Type.STRING,
-                    description: "Mandatory translation"
+                    description: "Translated string"
                   }
                 },
                 required: ["box_2d", "translated_text"]
@@ -81,30 +113,28 @@ STRICT RULES:
       },
     });
 
-    // response.text property'si candidates[0].content.parts[0].text içeriğini getirir.
     const responseText = response.text;
     
     if (!responseText || responseText.trim() === "") {
-      console.error("[ENGINE-ERR] API boş yanıt döndürdü.");
-      throw new Error("API_EMPTY_RESPONSE");
+      console.error("[MangaTurk-Engine] API Boş Yanıt Döndürdü!");
+      throw new Error("API_RETURNED_EMPTY_CONTENT");
     }
 
-    console.log("[ENGINE-LOG] Ham Yanıt Alındı:", responseText);
+    console.log("[MangaTurk-Engine] Yanıt:", responseText);
 
     const parsed = JSON.parse(responseText.trim());
     
-    if (!parsed.bubbles || !Array.isArray(parsed.bubbles)) {
-      throw new Error("INVALID_JSON_STRUCTURE");
+    if (!parsed.bubbles) {
+      throw new Error("INVALID_JSON_STRUCTURE_NO_BUBBLES");
     }
 
     return parsed as TranslationResult;
 
   } catch (error: any) {
-    console.error("[ENGINE-CRITICAL] Çeviri Zinciri Kırıldı:", {
+    console.error("[MangaTurk-Engine] Kritik Çeviri Hatası:", {
       message: error.message,
-      code: error.status || "UNKNOWN"
+      status: error.status || "Unknown",
     });
-    // Hata durumunda sessiz kalma, hatayı yukarı fırlat
     throw error;
   }
 };
