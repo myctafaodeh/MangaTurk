@@ -30,10 +30,10 @@ const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, 
       setIframeError(false);
       setIsIframeLoading(true);
       
-      // Iframe koruma tespiti (7 saniye yüklenmezse hata say)
+      // Iframe koruma tespiti (Android WebView'larda ERR_BLOCKED_BY_RESPONSE yaygındır)
       const timer = setTimeout(() => {
          if (isIframeLoading) {
-           console.error("[MangaViewer] Site erişimi kısıtlanmış olabilir (ERR_BLOCKED_BY_RESPONSE).");
+           console.warn("[VIEWER-WARN] Site erişimi engellenmiş olabilir.");
            setIframeError(true);
            setIsIframeLoading(false);
          }
@@ -53,7 +53,7 @@ const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, 
         if (settings.isEnabled && (customImage || activeUrl)) {
           onScrollStop(customImage || activeUrl || "", el.scrollTop, el.clientHeight); 
         }
-      }, 1800); 
+      }, 1500); 
     };
 
     el.addEventListener('scroll', handleScroll);
@@ -93,9 +93,9 @@ const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, 
                             <div className="w-20 h-20 bg-red-600/10 rounded-3xl flex items-center justify-center mb-8 border border-red-600/20 shadow-2xl">
                                 <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                             </div>
-                            <h2 className="text-white font-black text-xl mb-4 uppercase tracking-tighter">İÇERİK ENGELLENDİ</h2>
-                            <p className="text-zinc-500 text-[11px] mb-10 leading-relaxed font-medium max-w-[280px]">Bu site güvenlik politikası (X-Frame-Options) nedeniyle uygulama içerisinde açılamıyor. <br/><br/> Lütfen <b>CİHAZDAN YÜKLE</b> özelliğini kullanın.</p>
-                            <button onClick={() => window.open(activeUrl, '_blank')} className="w-full max-w-[240px] py-4 bg-zinc-900 border border-white/5 rounded-2xl text-[10px] font-black text-white shadow-xl active:scale-95 transition-all uppercase tracking-widest">TARAYICIDA AÇ</button>
+                            <h2 className="text-white font-black text-xl mb-4 uppercase tracking-tighter">SİTE ERİŞİMİ ENGELLENDİ</h2>
+                            <p className="text-zinc-500 text-[11px] mb-10 leading-relaxed font-medium max-w-[280px]">Bu site güvenlik politikası (X-Frame-Options) nedeniyle uygulama içerisinde açılamıyor. <br/><br/> <b>ÇÖZÜM:</b> Bölümü tarayıcıda açıp ekran görüntüsü alarak <b>CİHAZDAN YÜKLE</b> özelliğini kullanın.</p>
+                            <button onClick={() => window.open(activeUrl, '_blank')} className="w-full max-w-[240px] py-4 bg-blue-600 rounded-2xl text-[10px] font-black text-white shadow-xl active:scale-95 transition-all uppercase tracking-widest">TARAYICIDA AÇ</button>
                         </div>
                     ) : (
                         <iframe 
@@ -103,7 +103,7 @@ const MangaViewer = forwardRef<MangaViewerHandle, MangaViewerProps>(({ bubbles, 
                           src={activeUrl} 
                           onLoad={() => { setIsIframeLoading(false); setIframeError(false); }}
                           onError={() => { setIsIframeLoading(false); setIframeError(true); }}
-                          className="w-full h-[20000px] border-none bg-white"
+                          className="w-full h-[15000px] border-none bg-white"
                           title="Manga Frame"
                         />
                     )}
